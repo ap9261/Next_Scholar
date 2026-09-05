@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+.venv/
+venv/
+classroom.db
+*.db
+uploads/*
+outputs/*
+transcriptions/*
+!uploads/.gitkeep
+!outputs/.gitkeep
+!transcriptions/.gitkeep
+.DS_Store
+Thumbs.db
