@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NextScholar Audio Analyzer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; min-height: 100vh; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px 0; text-align: center; margin-bottom: 30px; }
+        header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        header p { font-size: 1.1em; opacity: 0.9; }
+        .card { background: white; border-radius: 12px; padding: 25px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .card h2 { color: #333; margin-bottom: 15px; font-size: 1.5em; border-bottom: 2px solid #667eea; padding-bottom: 10px; }
+        .upload-area { border: 3px dashed #667eea; border-radius: 12px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.3s; background: #f8f9ff; }
+        .upload-area:hover { background: #eef1ff; border-color: #764ba2; }
+        .upload-area.dragover { background: #eef1ff; border-color: #764ba2; transform: scale(1.02); }
+        .upload-icon { font-size: 48px; color: #667eea; margin-bottom: 15px; }
+        .btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px 30px; border-radius: 8px; font-size: 1em; cursor: pointer; transition: transform 0.2s; margin: 5px; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4); }
+        .btn:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: #6c757d; }
+        .btn-secondary:hover { box-shadow: 0 5px 15px rgba(108, 117, 125, 0.4); }
+        .file-info { margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; display: none; }
+        .file-info.show { display: block; }
+        .file-info p { margin: 5px 0; color: #555; }
+        .progress-container { width: 100%; background: #e0e0e0; border-radius: 10px; height: 20px; margin: 20px 0; overflow: hidden; display: none; }
+        .progress-container.show { display: block; }
+        .progress-bar { height: 100%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); transition: width 0.3s; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.8em; font-weight: bold; }
+        .status-badge { display: inline-block; padding: 6px 15px; border-radius: 20px; font-size: 0.9em; font-weight: bold; margin-left: 10px; }
+        .status-queued { background: #fff3cd; color: #856404; }
+        .status-processing { background: #d1ecf1; color: #0c5460; }
+        .status-completed { background: #d4edda; color: #155724; }
+        .status-failed { background: #f8d7da; color: #721c24; }
+        .result-section { display: none; }
+        .result-section.show { display: block; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e0e0e0; }
+        .tab { padding: 10px 20px; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.3s; }
+        .tab.active { border-bottom-color: #667eea; color: #667eea; font-weight: bold; }
+        .tab:hover { color: #667eea; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .segment { padding: 12px; margin: 8px 0; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea; }
+        .segment-time { font-weight: bold; color: #667eea; font-size: 0.9em; }
+        .segment-text { margin-top: 5px; color: #333; }
+        .segment-speaker { display: inline-block; background: #667eea; color: white; padding: 2px 10px; border-radius: 12px; font-size: 0.8em; margin-left: 10px; }
+        pre { background: #f4f4f4; padding: 15px; border-radius: 8px; overflow-x: auto; max-height: 500px; overflow-y: auto; }
+        .error { background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; margin: 10px 0; }
+        .success { background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 10px 0; }
+        .loading { text-align: center; padding: 20px; color: #667eea; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #667eea; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>🎙️ NextScholar Audio Analyzer</h1>
+            <p>Upload classroom audio for transcription, speaker analysis, and comprehensive reporting</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="card">
+            <h2>📁 Upload Audio File</h2>
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📁</div>
+                <p><strong>Drag & Drop audio file here</strong></p>
+                <p>or</p>
+                <input type="file" id="audioFile" accept="audio/*,.m4a,.mp3,.wav,.flac,.aac,.ogg" style="display: none;">
+                <button class="btn" onclick="document.getElementById('audioFile').click()">Choose File</button>
+                <p style="margin-top: 10px; font-size: 0.9em; color: #666;">Supported: m4a, mp3, wav, flac, aac, ogg</p>
+            </div>
+            <div class="file-info" id="fileInfo">
+                <p><strong>File:</strong> <span id="fileName"></span></p>
+                <p><strong>Size:</strong> <span id="fileSize"></span></p>
+                <p><strong>Type:</strong> <span id="fileType"></span></p>
+            </div>
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="btn" id="uploadBtn" onclick="uploadAudio()" disabled>Upload Audio</button>
+                <button class="btn btn-secondary" id="analyzeBtn" onclick="startAnalysis()" disabled>Start Analysis</button>
+            </div>
+        </div>
+
+        <div class="card" id="progressCard" style="display: none;">
+            <h2>⏳ Analysis Progress</h2>
+            <div class="progress-container show" id="progressContainer">
+                <div class="progress-bar" id="progressBar" style="width: 0%">0%</div>
+            </div>
+            <p id="statusText">Initializing...</p>
+            <p id="currentStage" style="color: #666; font-size: 0.9em;"></p>
+        </div>
+
+        <div class="card result-section" id="resultSection">
+            <h2>📊 Analysis Results</h2>
+            <div style="margin-bottom: 15px;">
+                <button class="btn" onclick="downloadJson()">⬇️ Download JSON</button>
+            </div>
+            <div class="tabs">
+                <div class="tab active" onclick="showTab('transcript')">Transcript</div>
+                <div class="tab" onclick="showTab('interaction')">Interaction</div>
+                <div class="tab" onclick="showTab('quality')">Communication Quality</div>
+                <div class="tab" onclick="showTab('performance')">Performance</div>
+                <div class="tab" onclick="showTab('sentiment')">Sentiment</div>
+                <div class="tab" onclick="showTab('report')">Final Report</div>
+            </div>
+
+            <div class="tab-content active" id="transcriptTab">
+                <h3>Transcript</h3>
+                <div id="transcriptContent"></div>
+            </div>
+
+            <div class="tab-content" id="interactionTab">
+                <h3>Interaction Analysis</h3>
+                <div id="interactionContent"></div>
+            </div>
+
+            <div class="tab-content" id="qualityTab">
+                <h3>Communication Quality</h3>
+                <div id="qualityContent"></div>
+            </div>
+
+            <div class="tab-content" id="performanceTab">
+                <h3>Student Performance</h3>
+                <div id="performanceContent"></div>
+            </div>
+
+            <div class="tab-content" id="sentimentTab">
+                <h3>Communication Sentiment</h3>
+                <div id="sentimentContent"></div>
+            </div>
+
+            <div class="tab-content" id="reportTab">
+                <h3>Final Report</h3>
+                <div id="reportContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+        let currentAudioId = null;
+        let currentJobId = null;
+        let currentResultData = null;
+        let pollInterval = null;
+
+        const uploadArea = document.getElementById('uploadArea');
+        const audioFileInput = document.getElementById('audioFile');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        audioFileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+            document.getElementById('fileType').textContent = file.type || 'audio';
+            document.getElementById('fileInfo').classList.add('show');
+            uploadBtn.disabled = false;
+        }
+
+        async function uploadAudio() {
+            const file = audioFileInput.files[0];
+            if (!file) return;
+
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading...';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch(`${API_BASE}/api/audio/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Upload failed');
+                }
+
+                const data = await response.json();
+                currentAudioId = data.audio_id;
+                
+                document.getElementById('fileInfo').classList.add('success');
+                document.getElementById('fileName').textContent = `✓ Uploaded: ${data.filename}`;
+                document.getElementById('fileSize').textContent = `Duration: ${data.duration?.toFixed(1) || 'N/A'}s | Size: ${data.file_size?.toFixed(0) || 'N/A'} bytes`;
+                document.getElementById('fileType').textContent = `Format: ${data.format || 'N/A'} | Sample Rate: ${data.sample_rate || 'N/A'} | Channels: ${data.channels || 'N/A'}`;
+                
+                analyzeBtn.disabled = false;
+                uploadBtn.textContent = 'Upload Complete';
+            } catch (error) {
+                alert('Upload failed: ' + error.message);
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload Audio';
+            }
+        }
+
+        async function startAnalysis() {
+            if (!currentAudioId) return;
+
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = 'Starting Analysis...';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/audio/analyze?audio_id=${currentAudioId}`, {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Analysis start failed');
+                }
+
+                const data = await response.json();
+                currentJobId = data.job_id;
+
+                document.getElementById('progressCard').style.display = 'block';
+                document.getElementById('resultSection').classList.add('show');
+                
+                pollStatus();
+                pollInterval = setInterval(pollStatus, 2000);
+            } catch (error) {
+                alert('Analysis start failed: ' + error.message);
+                analyzeBtn.disabled = false;
+                analyzeBtn.textContent = 'Start Analysis';
+            }
+        }
+
+        async function pollStatus() {
+            if (!currentJobId) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/audio/status/${currentJobId}`);
+                if (!response.ok) {
+                    throw new Error('Failed to get status');
+                }
+
+                const data = await response.json();
+                updateProgress(data);
+
+                if (data.status === 'completed') {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                    analyzeBtn.textContent = 'Analysis Complete';
+                    loadResults();
+                } else if (data.status === 'failed') {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                    analyzeBtn.textContent = 'Analysis Failed';
+                    document.getElementById('statusText').innerHTML = `<span class="error">❌ Analysis failed: ${data.error_message || 'Unknown error'}</span>`;
+                } else {
+                    document.getElementById('statusText').innerHTML = `<span class="status-badge status-processing">⏳ ${data.status}</span>`;
+                }
+            } catch (error) {
+                console.error('Status check failed:', error);
+            }
+        }
+
+        function updateProgress(data) {
+            const progress = data.progress || 0;
+            document.getElementById('progressBar').style.width = progress + '%';
+            document.getElementById('progressBar').textContent = Math.round(progress) + '%';
+            document.getElementById('currentStage').textContent = `Stage: ${data.current_stage || 'Unknown'}`;
+        }
+
+        async function loadResults() {
+            if (!currentJobId) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/audio/result/${currentJobId}`);
+                if (!response.ok) {
+                    throw new Error('Failed to load results');
+                }
+
+                const data = await response.json();
+                currentResultData = data;
+                displayResults(data);
+            } catch (error) {
+                console.error('Failed to load results:', error);
+            }
+        }
+
+        function downloadJson() {
+            if (!currentResultData) {
+                alert('No results available to download');
+                return;
+            }
+
+            const blob = new Blob([JSON.stringify(currentResultData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `audio_analysis_${currentJobId || 'result'}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function displayResults(data) {
+            // Audio info
+            const audio = data.audio || {};
+            console.log('Audio:', audio);
+
+            // Transcript
+            const transcript = data.transcript || {};
+            const transcriptContent = document.getElementById('transcriptContent');
+            if (transcript.segments && transcript.segments.length > 0) {
+                transcriptContent.innerHTML = transcript.segments.map((seg, i) => `
+                    <div class="segment">
+                        <span class="segment-time">${formatTime(seg.start)} - ${formatTime(seg.end)}</span>
+                        <span class="segment-speaker">${seg.speaker || 'Unknown'}</span>
+                        <p class="segment-text">${seg.text}</p>
+                    </div>
+                `).join('');
+            } else {
+                transcriptContent.innerHTML = '<p>No transcript available</p>';
+            }
+
+            // Interaction
+            const interaction = data.analysis?.interaction?.data || {};
+            document.getElementById('interactionContent').innerHTML = interaction.report_text 
+                ? `<pre>${escapeHtml(interaction.report_text)}</pre>`
+                : '<p>No interaction data available</p>';
+
+            // Communication Quality
+            const quality = data.analysis?.communication_quality?.data || {};
+            document.getElementById('qualityContent').innerHTML = quality.report_text
+                ? `<pre>${escapeHtml(quality.report_text)}</pre>`
+                : '<p>No communication quality data available</p>';
+
+            // Student Performance
+            const performance = data.analysis?.student_performance?.data || {};
+            document.getElementById('performanceContent').innerHTML = performance.report_text
+                ? `<pre>${escapeHtml(performance.report_text)}</pre>`
+                : '<p>No performance data available</p>';
+
+            // Sentiment
+            const sentiment = data.analysis?.communication_sentiment?.data || {};
+            document.getElementById('sentimentContent').innerHTML = sentiment.report_text
+                ? `<pre>${escapeHtml(sentiment.report_text)}</pre>`
+                : '<p>No sentiment data available</p>';
+
+            // Final Report
+            const finalReport = data.analysis?.final_report?.data || {};
+            const reportText = finalReport.report_text || finalReport.conclusion || '';
+            document.getElementById('reportContent').innerHTML = reportText
+                ? `<pre>${escapeHtml(reportText)}</pre>`
+                : '<p>No final report available</p>';
+        }
+
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName + 'Tab').classList.add('active');
+        }
+
+        function formatTime(seconds) {
+            if (!seconds && seconds !== 0) return '00:00';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Check server health on load
+        fetch(`${API_BASE}/health`)
+            .then(r => r.json())
+            .then(data => {
+                console.log('Server health:', data);
+                if (data.status !== 'ok') {
+                    alert('Warning: Backend server may not be fully operational');
+                }
+            })
+            .catch(err => {
+                console.error('Health check failed:', err);
+                alert('Cannot connect to backend server at ' + API_BASE);
+            });
+    </script>
+</body>
+</html>

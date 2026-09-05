@@ -1,6 +1,9 @@
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from app.api.health import router as health_router
 from app.api.audio import router as audio_router
 from app.api.analysis import router as analysis_router
@@ -22,6 +25,22 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(audio_router)
 app.include_router(analysis_router)
+
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "Audio_Frontend"
+
+if FRONTEND_DIR.exists():
+    app.mount("/static", StaticFiles(directory=FRONTEND_DIR / "static"), name="frontend-static")
+
+    @app.get("/", include_in_schema=False)
+    async def serve_frontend():
+        index = FRONTEND_DIR / "index.html"
+        if index.exists():
+            return HTMLResponse(content=index.read_text(encoding="utf-8"))
+        return HTMLResponse(content="<h1>Frontend not found</h1>", status_code=404)
+else:
+    @app.get("/", include_in_schema=False)
+    async def frontend_missing():
+        return HTMLResponse(content="<h1>Frontend not available</h1>", status_code=404)
 
 
 @app.on_event("startup")
